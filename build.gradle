@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.devinblack.kafka.connect'
-version = '1.0.0-SNAPSHOT'
+version = '0.1.2'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -124,6 +124,56 @@ task fatJar(type: Jar) {
     }
 
     with jar
+}
+
+// Confluent Hub Archive Tasks
+ext {
+    confluentArchiveName = "devinblack-kafka-connect-http-sink"
+}
+
+task prepareConfluentArchive(type: Copy) {
+    group = "Confluent"
+    description = "Prepares the directory structure for Confluent Hub archive"
+    dependsOn jar
+
+    into("$buildDir/confluentArchive")
+
+    // Copy JAR
+    from(jar) {
+        into 'lib'
+    }
+
+    // Copy dependencies
+    from(configurations.runtimeClasspath) {
+        into 'lib'
+    }
+
+    // Copy manifest
+    from('manifest.json') {
+        into '.'
+    }
+
+    // Copy documentation
+    from('README.md') {
+        into 'doc'
+    }
+
+    // Copy config examples
+    from('config') {
+        into 'etc'
+    }
+}
+
+task createConfluentArchive(type: Zip) {
+    group = "Confluent"
+    description = "Creates the Confluent Archive zipfile to be uploaded to the Confluent Hub"
+    dependsOn prepareConfluentArchive
+
+    from files("$buildDir/confluentArchive")
+    archiveBaseName.set("")
+    archiveAppendix.set(confluentArchiveName)
+    archiveVersion.set(project.version.toString())
+    destinationDirectory.set(file("$buildDir/confluent"))
 }
 
 publishing {
