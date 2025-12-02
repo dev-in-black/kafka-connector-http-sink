@@ -40,6 +40,10 @@ jobs:
           tag_name: ${{ env.RELEASE_VERSION }}
         env:
           GITHUB_TOKEN: ${{ secrets.PAT }}
+      - name: Test-path
+        run: |
+          ls ./build
+          ls ./build/confluent
       - name: upload release artifact
         uses: actions/upload-release-asset@v1
         env:
