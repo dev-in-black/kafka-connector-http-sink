@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set env
-        run: echo "RELEASE_VERSION=$(cat VERSION)" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
       - name: Test
         run: |
           echo $RELEASE_VERSION
