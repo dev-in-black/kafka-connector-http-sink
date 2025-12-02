@@ -1,6 +1,6 @@
 {
   "name": "kafka-connect-http-sink",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "title": "HTTP Sink Connector",
   "description": "A production-ready Kafka Connect sink connector for sending records to HTTP endpoints with header forwarding and response handling",
   "owner": {

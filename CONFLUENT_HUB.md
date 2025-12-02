@@ -65,7 +65,7 @@ The `manifest.json` includes all required fields:
 
 The version is managed centrally in the `VERSION` file at the project root. Both build systems read from this file to ensure consistency.
 
-Current version: `v0.1.3`
+Current version: `v0.1.4`
 
 ## Required Files
 
@@ -97,7 +97,7 @@ Archives follow the Confluent Hub naming convention:
 ${componentOwner}-${componentName}-${componentVersion}.zip
 ```
 
-Example: `devinblack-kafka-connect-http-sink-0.1.3.zip`
+Example: `devinblack-kafka-connect-http-sink-v0.1.4.zip`
 
 ## Excluded Dependencies
 
