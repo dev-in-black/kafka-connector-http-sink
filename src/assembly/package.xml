@@ -9,6 +9,25 @@
     </formats>
     <includeBaseDirectory>false</includeBaseDirectory>
     <fileSets>
+        <!-- Copy manifest.json to root -->
+        <fileSet>
+            <directory>${project.basedir}</directory>
+            <outputDirectory>/</outputDirectory>
+            <includes>
+                <include>manifest.json</include>
+            </includes>
+        </fileSet>
+
+        <!-- Copy documentation (LICENSE, README.md, version.txt) -->
+        <fileSet>
+            <directory>${project.basedir}/doc</directory>
+            <outputDirectory>doc/</outputDirectory>
+            <includes>
+                <include>**/*</include>
+            </includes>
+        </fileSet>
+
+        <!-- Copy config examples to etc/ -->
         <fileSet>
             <directory>${project.basedir}/config</directory>
             <outputDirectory>etc/</outputDirectory>
@@ -16,19 +35,18 @@
                 <include>**/*</include>
             </includes>
         </fileSet>
+
+        <!-- Copy assets (logo and images only, no subdirectories) -->
         <fileSet>
-            <directory>${project.basedir}/docs</directory>
-            <outputDirectory>docs/</outputDirectory>
-        </fileSet>
-        <fileSet>
-            <directory>${project.basedir}</directory>
-            <outputDirectory>/</outputDirectory>
+            <directory>${project.basedir}/assets</directory>
+            <outputDirectory>assets/</outputDirectory>
             <includes>
-                <include>README.md</include>
-                <include>LICENSE</include>
+                <include>*</include>
             </includes>
         </fileSet>
     </fileSets>
+
+    <!-- Copy all runtime dependencies to lib/ (excluding Kafka Connect framework) -->
     <dependencySets>
         <dependencySet>
             <outputDirectory>lib/</outputDirectory>
@@ -36,6 +54,7 @@
             <scope>runtime</scope>
             <excludes>
                 <exclude>org.apache.kafka:*</exclude>
+                <exclude>org.slf4j:*</exclude>
             </excludes>
         </dependencySet>
     </dependencySets>

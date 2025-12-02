@@ -10,6 +10,7 @@
     "url": "https://github.com/devinblack"
   },
   "support": {
+    "provider_name": "Dev in Black",
     "summary": "Community support via GitHub issues",
     "url": "https://github.com/devinblack/kafka-connect-http-sink/issues",
     "logo": "assets/logo.png"

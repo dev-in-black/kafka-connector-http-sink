@@ -155,29 +155,34 @@ task prepareConfluentArchive(type: Copy) {
 
     into("$buildDir/confluentArchive")
 
-    // Copy JAR
+    // Copy JAR (only the connector JAR, not Kafka Connect framework libraries)
     from(jar) {
         into 'lib'
     }
 
-    // Copy dependencies
+    // Copy runtime dependencies (excluding provided Kafka Connect libraries)
     from(configurations.runtimeClasspath) {
         into 'lib'
     }
 
-    // Copy processed manifest
+    // Copy processed manifest to root
     from("$buildDir/processedManifest/manifest.json") {
         into '.'
     }
 
-    // Copy documentation
-    from('README.md') {
+    // Copy documentation directory (must include LICENSE, README.md, version.txt)
+    from('doc') {
         into 'doc'
     }
 
-    // Copy config examples
+    // Copy config examples to etc directory
     from('config') {
         into 'etc'
+    }
+
+    // Copy assets directory (for logo and images)
+    from('assets') {
+        into 'assets'
     }
 }
 
