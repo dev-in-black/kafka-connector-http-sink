@@ -29,7 +29,7 @@ jobs:
         uses: gradle/gradle-build-action@v2
         with:
           arguments: createConfluentArchive
-          gradle-version: '7.4.2'
+          gradle-version: '8.5.1'
       - name: release
         uses: actions/create-release@v1
         id: create_release
@@ -46,8 +46,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.PAT }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/confluent/clickhouse-kafka-connect-${{ env.RELEASE_VERSION }}.zip
-          asset_name: clickhouse-kafka-connect-${{ env.RELEASE_VERSION }}.zip
+          asset_path: ./build/confluent/devinbalck-kafka-connect-${{ env.RELEASE_VERSION }}.zip
+          asset_name: devinbalck-kafka-connect-${{ env.RELEASE_VERSION }}.zip
           asset_content_type: application/zip
       - name: Tag latest commit as release
         run: |

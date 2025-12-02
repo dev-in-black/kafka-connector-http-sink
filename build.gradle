@@ -1,0 +1,166 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'jacoco'
+}
+
+group = 'com.devinblack.kafka.connect'
+version = '1.0.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    kafkaVersion = '3.6.0'
+    okhttpVersion = '4.12.0'
+    jacksonVersion = '2.15.3'
+    slf4jVersion = '2.0.9'
+    junitVersion = '5.10.1'
+    mockitoVersion = '5.7.0'
+    wiremockVersion = '3.3.1'
+    testcontainersVersion = '1.19.3'
+    guavaVersion = '32.1.3-jre'
+    assertjVersion = '3.24.2'
+    awaitilityVersion = '4.2.0'
+}
+
+dependencies {
+    // Kafka Connect API (provided - will be on classpath at runtime)
+    compileOnly "org.apache.kafka:connect-api:${kafkaVersion}"
+    compileOnly "org.apache.kafka:connect-runtime:${kafkaVersion}"
+    compileOnly "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    compileOnly "org.slf4j:slf4j-api:${slf4jVersion}"
+
+    // HTTP Client
+    implementation "com.squareup.okhttp3:okhttp:${okhttpVersion}"
+
+    // JSON Processing
+    implementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+
+    // Utilities
+    implementation "com.google.guava:guava:${guavaVersion}"
+
+    // Testing
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitVersion}"
+    testImplementation "org.mockito:mockito-core:${mockitoVersion}"
+    testImplementation "org.mockito:mockito-junit-jupiter:${mockitoVersion}"
+    testImplementation "org.assertj:assertj-core:${assertjVersion}"
+    testImplementation "org.awaitility:awaitility:${awaitilityVersion}"
+
+    // WireMock for HTTP mocking
+    testImplementation "org.wiremock:wiremock:${wiremockVersion}"
+
+    // Testcontainers for integration tests
+    testImplementation "org.testcontainers:testcontainers:${testcontainersVersion}"
+    testImplementation "org.testcontainers:kafka:${testcontainersVersion}"
+    testImplementation "org.testcontainers:junit-jupiter:${testcontainersVersion}"
+
+    // Test runtime dependencies
+    testRuntimeOnly "org.slf4j:slf4j-simple:${slf4jVersion}"
+    testImplementation "org.apache.kafka:connect-api:${kafkaVersion}"
+    testImplementation "org.apache.kafka:connect-runtime:${kafkaVersion}"
+    testImplementation "org.apache.kafka:kafka-clients:${kafkaVersion}"
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+// Create distribution with all dependencies
+task dist(type: Zip) {
+    archiveBaseName = 'kafka-connect-http-sink'
+    archiveVersion = version
+
+    from jar
+    from configurations.runtimeClasspath
+
+    into('config') {
+        from 'config'
+    }
+
+    into('docs') {
+        from 'README.md'
+        from 'IMPLEMENTATION_STATUS.md'
+    }
+}
+
+// Task to create a fat JAR with all dependencies
+task fatJar(type: Jar) {
+    archiveBaseName = project.name + '-all'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes 'Implementation-Title': 'Kafka Connect HTTP Sink Connector',
+                   'Implementation-Version': version
+    }
+
+    from {
+        configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+
+    with jar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+
+            pom {
+                name = 'Kafka Connect HTTP Sink Connector'
+                description = 'A production-ready Kafka Connect sink connector for sending records to HTTP endpoints with header forwarding and response handling'
+                url = 'https://github.com/devinblack/kafka-connect-http-sink'
+
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'devinblack'
+                        name = 'Devin Black'
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Custom task to display project info
+task info {
+    doLast {
+        println "Project: ${project.name}"
+        println "Version: ${project.version}"
+        println "Group: ${project.group}"
+        println "Java Version: ${java.sourceCompatibility}"
+        println "Kafka Version: ${kafkaVersion}"
+    }
+}
