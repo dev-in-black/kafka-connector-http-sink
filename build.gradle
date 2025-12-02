@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.devinblack.kafka.connect'
-version = '0.1.2'
+version = file('VERSION').text.trim()
 
 java {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -131,10 +131,27 @@ ext {
     confluentArchiveName = "devinblack-kafka-connect-http-sink"
 }
 
+task processManifest {
+    group = "Confluent"
+    description = "Process manifest.json with version from VERSION file"
+
+    doLast {
+        def manifestFile = file('manifest.json')
+        def manifestContent = manifestFile.text
+        def processedContent = manifestContent.replaceAll('"version":\\s*"[^"]*"', "\"version\": \"${project.version}\"")
+
+        def outputDir = file("$buildDir/processedManifest")
+        outputDir.mkdirs()
+
+        def outputFile = new File(outputDir, 'manifest.json')
+        outputFile.text = processedContent
+    }
+}
+
 task prepareConfluentArchive(type: Copy) {
     group = "Confluent"
     description = "Prepares the directory structure for Confluent Hub archive"
-    dependsOn jar
+    dependsOn jar, processManifest
 
     into("$buildDir/confluentArchive")
 
@@ -148,8 +165,8 @@ task prepareConfluentArchive(type: Copy) {
         into 'lib'
     }
 
-    // Copy manifest
-    from('manifest.json') {
+    // Copy processed manifest
+    from("$buildDir/processedManifest/manifest.json") {
         into '.'
     }
 
