@@ -4,6 +4,7 @@ import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -77,10 +78,12 @@ public class HttpRequestBuilder {
         RequestBody requestBody = null;
         if (body != null) {
             MediaType mediaType = MediaType.parse(contentType);
-            requestBody = RequestBody.create(body, mediaType);
+            // Use byte array to prevent OkHttp from appending charset=utf-8
+            byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+            requestBody = RequestBody.create(bodyBytes, mediaType);
         } else if ("POST".equals(method) || "PUT".equals(method)) {
             // Empty body for POST/PUT if no body specified
-            requestBody = RequestBody.create("", MediaType.parse("application/json"));
+            requestBody = RequestBody.create(new byte[0], MediaType.parse("application/json"));
         }
 
         // Set method and body
