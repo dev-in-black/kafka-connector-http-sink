@@ -132,6 +132,18 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
     private static final boolean RESPONSE_INCLUDE_REQUEST_METADATA_DEFAULT = true;
     private static final String RESPONSE_INCLUDE_REQUEST_METADATA_DOC = "Include request metadata in response headers";
 
+    public static final String RESPONSE_VALUE_FORMAT = "response.value.format";
+    private static final String RESPONSE_VALUE_FORMAT_DEFAULT = "string";
+    private static final String RESPONSE_VALUE_FORMAT_DOC =
+            "Format for response values sent to Kafka (string or json). " +
+            "JSON format validates response body is valid JSON and fails/warns if invalid.";
+
+    public static final String RESPONSE_ORIGINAL_HEADERS_INCLUDE = "response.original.headers.include";
+    private static final String RESPONSE_ORIGINAL_HEADERS_INCLUDE_DEFAULT = "";
+    private static final String RESPONSE_ORIGINAL_HEADERS_INCLUDE_DOC =
+            "Comma-separated list of original Kafka record header names to include in response. " +
+            "Empty means include all headers when response.include.original.headers is enabled.";
+
     // =============================
     // ERROR HANDLING CONFIGURATION
     // =============================
@@ -369,6 +381,19 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
                 RESPONSE_INCLUDE_REQUEST_METADATA_DEFAULT,
                 ConfigDef.Importance.LOW,
                 RESPONSE_INCLUDE_REQUEST_METADATA_DOC
+        ).define(
+                RESPONSE_VALUE_FORMAT,
+                ConfigDef.Type.STRING,
+                RESPONSE_VALUE_FORMAT_DEFAULT,
+                ConfigDef.ValidString.in("string", "json"),
+                ConfigDef.Importance.MEDIUM,
+                RESPONSE_VALUE_FORMAT_DOC
+        ).define(
+                RESPONSE_ORIGINAL_HEADERS_INCLUDE,
+                ConfigDef.Type.STRING,
+                RESPONSE_ORIGINAL_HEADERS_INCLUDE_DEFAULT,
+                ConfigDef.Importance.LOW,
+                RESPONSE_ORIGINAL_HEADERS_INCLUDE_DOC
         );
 
         // Error Handling Configuration
@@ -625,6 +650,21 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
 
     public boolean isResponseIncludeRequestMetadata() {
         return getBoolean(RESPONSE_INCLUDE_REQUEST_METADATA);
+    }
+
+    public String getResponseValueFormat() {
+        return getString(RESPONSE_VALUE_FORMAT);
+    }
+
+    public List<String> getResponseOriginalHeadersInclude() {
+        String include = getString(RESPONSE_ORIGINAL_HEADERS_INCLUDE);
+        if (include == null || include.trim().isEmpty()) {
+            return null;  // null means include all
+        }
+        return Arrays.stream(include.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
     }
 
     // Getters for Error Handling Configuration

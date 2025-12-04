@@ -270,6 +270,601 @@ class ResponseHandlerTest {
         assertEquals("errors", responseRecord.getTopic());
     }
 
+    // =============================
+    // JSON FORMAT VALIDATION TESTS
+    // =============================
+
+    @Test
+    void testStringFormatWithJsonBody() {
+        // Default format is "string" - should work with JSON content
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "string");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{\"status\":\"ok\"}", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("{\"status\":\"ok\"}", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testStringFormatWithHtmlBody() {
+        // String format should work with any content type
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "string");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "<html><body>Hello</body></html>", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("<html><body>Hello</body></html>", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testStringFormatWithPlainText() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "string");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "Plain text response", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("Plain text response", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithValidJsonObject() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{\"status\":\"ok\",\"count\":42}", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("{\"status\":\"ok\",\"count\":42}", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithValidJsonArray() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "[1,2,3,4,5]", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("[1,2,3,4,5]", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithNestedJson() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        String nestedJson = "{\"user\":{\"id\":123,\"name\":\"test\",\"tags\":[\"a\",\"b\"]}}";
+        HttpResponse httpResponse = new HttpResponse(200, null, nestedJson, 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals(nestedJson, new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithEmptyObject() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{}", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("{}", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithEmptyArray() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "[]", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("[]", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithInvalidJsonPlainText() {
+        // JSON format should still create record but log error for invalid JSON
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "Not JSON", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        // Should still create record with fallback to string format
+        assertNotNull(responseRecord.getValue());
+        assertEquals("Not JSON", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithInvalidJsonHtml() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "<html><body>Error</body></html>", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        // Should still create record with fallback to string format
+        assertNotNull(responseRecord.getValue());
+        assertEquals("<html><body>Error</body></html>", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithMalformedJson() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{\"status\":\"ok\"", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        // Should still create record with fallback to string format
+        assertNotNull(responseRecord.getValue());
+        assertEquals("{\"status\":\"ok\"", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithInvalidJsonUnquotedKeys() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{status: ok}", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        // Should still create record with fallback to string format
+        assertNotNull(responseRecord.getValue());
+        assertEquals("{status: ok}", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatWithNullBody() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(204, null, null, 50L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNull(responseRecord.getValue(), "Value should be null when response body is null");
+    }
+
+    @Test
+    void testDefaultFormatIsString() {
+        // When no format is specified, should default to "string"
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        // Not setting RESPONSE_VALUE_FORMAT
+
+        HttpSinkConnectorConfig config = new HttpSinkConnectorConfig(props);
+        assertEquals("string", config.getResponseValueFormat());
+    }
+
+    @Test
+    void testJsonFormatCaseInsensitive() {
+        // Test that format is case insensitive
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "JSON");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{\"status\":\"ok\"}", 100L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        assertNotNull(responseRecord.getValue());
+        assertEquals("{\"status\":\"ok\"}", new String(responseRecord.getValue()));
+    }
+
+    @Test
+    void testJsonFormatHeadersUnchanged() {
+        // Verify that JSON format doesn't change headers structure
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_VALUE_FORMAT, "json");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_REQUEST_METADATA, "true");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "{\"status\":\"ok\"}", 150L);
+        SinkRecord originalRecord = createSimpleRecord();
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse,
+                originalRecord,
+                "responses"
+        );
+
+        // Verify metadata headers are still present
+        boolean foundStatusCode = false;
+        boolean foundResponseTime = false;
+
+        for (Header header : responseRecord.getHeaders()) {
+            if (ResponseMetadata.HEADER_STATUS_CODE.equals(header.key())) {
+                assertEquals(200, header.value());
+                foundStatusCode = true;
+            } else if (ResponseMetadata.HEADER_RESPONSE_TIME_MS.equals(header.key())) {
+                assertEquals(150L, header.value());
+                foundResponseTime = true;
+            }
+        }
+
+        assertTrue(foundStatusCode, "Status code header should be present in JSON format");
+        assertTrue(foundResponseTime, "Response time header should be present in JSON format");
+    }
+
+    // =============================
+    // ORIGINAL HEADER FILTERING TESTS
+    // =============================
+
+    @Test
+    void testOriginalHeadersDefaultIncludeAll() {
+        // When include list is empty, all original headers should be forwarded
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "true");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, "");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 100L);
+
+        // Create record with multiple headers
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+        originalRecord.headers().addString("userId", "user456");
+        originalRecord.headers().addString("requestId", "req789");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify all headers are present
+        assertTrue(hasHeader(responseRecord, "traceId"));
+        assertTrue(hasHeader(responseRecord, "userId"));
+        assertTrue(hasHeader(responseRecord, "requestId"));
+    }
+
+    @Test
+    void testOriginalHeadersIncludeListSingle() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "true");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, "traceId");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 100L);
+
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+        originalRecord.headers().addString("userId", "user456");
+        originalRecord.headers().addString("requestId", "req789");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify only traceId is present
+        assertTrue(hasHeader(responseRecord, "traceId"));
+        assertFalse(hasHeader(responseRecord, "userId"));
+        assertFalse(hasHeader(responseRecord, "requestId"));
+    }
+
+    @Test
+    void testOriginalHeadersIncludeListMultiple() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "true");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, "traceId,requestId");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 100L);
+
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+        originalRecord.headers().addString("userId", "user456");
+        originalRecord.headers().addString("requestId", "req789");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify only traceId and requestId are present
+        assertTrue(hasHeader(responseRecord, "traceId"));
+        assertFalse(hasHeader(responseRecord, "userId"));
+        assertTrue(hasHeader(responseRecord, "requestId"));
+    }
+
+    @Test
+    void testOriginalHeadersIncludeListWithWhitespace() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "true");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, " traceId , requestId ");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 100L);
+
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+        originalRecord.headers().addString("userId", "user456");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify whitespace is trimmed
+        assertTrue(hasHeader(responseRecord, "traceId"));
+        assertFalse(hasHeader(responseRecord, "userId"));
+    }
+
+    @Test
+    void testOriginalHeadersIncludeListNonExistent() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "true");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, "nonExistent");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 100L);
+
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+        originalRecord.headers().addString("userId", "user456");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify no original headers are present (non-existent header in list)
+        assertFalse(hasHeader(responseRecord, "traceId"));
+        assertFalse(hasHeader(responseRecord, "userId"));
+    }
+
+    @Test
+    void testOriginalHeadersDisabledIgnoresIncludeList() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "false");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, "traceId");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 100L);
+
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify no original headers when disabled
+        assertFalse(hasHeader(responseRecord, "traceId"));
+    }
+
+    @Test
+    void testOriginalHeadersIncludeListDoesNotAffectMetadata() {
+        Map<String, String> props = new HashMap<>();
+        props.put(HttpSinkConnectorConfig.HTTP_API_URL, "http://localhost:8080");
+        props.put(HttpSinkConnectorConfig.RESPONSE_TOPIC_NAME, "responses");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_ORIGINAL_HEADERS, "true");
+        props.put(HttpSinkConnectorConfig.RESPONSE_ORIGINAL_HEADERS_INCLUDE, "traceId");
+        props.put(HttpSinkConnectorConfig.RESPONSE_INCLUDE_REQUEST_METADATA, "true");
+
+        handler = new ResponseHandler(new HttpSinkConnectorConfig(props));
+
+        HttpResponse httpResponse = new HttpResponse(200, null, "body", 150L);
+
+        SinkRecord originalRecord = new SinkRecord(
+                "input-topic", 0, null, "key", null, "value", 100L, 1234567890000L, null
+        );
+        originalRecord.headers().addString("traceId", "trace123");
+        originalRecord.headers().addString("userId", "user456");
+
+        ResponseRecord responseRecord = handler.createResponseRecord(
+                httpResponse, originalRecord, "responses"
+        );
+
+        // Verify metadata headers are present regardless of include list
+        boolean foundStatusCode = false;
+        boolean foundResponseTime = false;
+
+        for (Header header : responseRecord.getHeaders()) {
+            if (ResponseMetadata.HEADER_STATUS_CODE.equals(header.key())) {
+                foundStatusCode = true;
+            } else if (ResponseMetadata.HEADER_RESPONSE_TIME_MS.equals(header.key())) {
+                foundResponseTime = true;
+            }
+        }
+
+        assertTrue(foundStatusCode);
+        assertTrue(foundResponseTime);
+
+        // Verify only traceId from original headers
+        assertTrue(hasHeader(responseRecord, "traceId"));
+        assertFalse(hasHeader(responseRecord, "userId"));
+    }
+
+    // Helper methods
+    private boolean hasHeader(ResponseRecord record, String headerName) {
+        for (Header header : record.getHeaders()) {
+            if (header.key().equals(headerName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Helper method
     private SinkRecord createSimpleRecord() {
         return new SinkRecord(

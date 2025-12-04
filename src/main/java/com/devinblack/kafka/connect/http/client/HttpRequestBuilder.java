@@ -65,22 +65,33 @@ public class HttpRequestBuilder {
 
         Request.Builder builder = new Request.Builder().url(url);
 
-        // Add headers
-        headers.forEach(builder::addHeader);
+        // Determine the Content-Type to use
+        // Use explicitly set header, otherwise use default contentType
+        String actualContentType = headers.getOrDefault("Content-Type", contentType);
 
-        // Add Content-Type if body is present
-        if (body != null && !headers.containsKey("Content-Type")) {
-            builder.addHeader("Content-Type", contentType);
-        }
+        // Add all headers EXCEPT Content-Type (we'll handle it separately)
+        headers.forEach((name, value) -> {
+            if (!"Content-Type".equalsIgnoreCase(name)) {
+                builder.addHeader(name, value);
+            }
+        });
 
         // Build request body
         RequestBody requestBody = null;
         if (body != null) {
-            MediaType mediaType = MediaType.parse(contentType);
-            requestBody = RequestBody.create(body, mediaType);
+            // Create RequestBody with null MediaType to prevent OkHttp from adding charset
+            requestBody = RequestBody.create(body, null);
+            // Manually set Content-Type header to exact value (no charset auto-added)
+            builder.addHeader("Content-Type", actualContentType);
         } else if ("POST".equals(method) || "PUT".equals(method)) {
             // Empty body for POST/PUT if no body specified
-            requestBody = RequestBody.create("", MediaType.parse("application/json"));
+            requestBody = RequestBody.create("", null);
+            // Add Content-Type only if body is present
+            if (!headers.containsKey("Content-Type")) {
+                builder.addHeader("Content-Type", contentType);
+            } else {
+                builder.addHeader("Content-Type", actualContentType);
+            }
         }
 
         // Set method and body
