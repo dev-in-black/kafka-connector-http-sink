@@ -5,6 +5,9 @@ import com.devinblack.kafka.connect.http.auth.AuthenticationProviderFactory;
 import com.devinblack.kafka.connect.http.client.HttpClient;
 import com.devinblack.kafka.connect.http.client.HttpRequestBuilder;
 import com.devinblack.kafka.connect.http.client.HttpResponse;
+import com.devinblack.kafka.connect.http.error.ErrorHandler;
+import com.devinblack.kafka.connect.http.error.ErrorProducer;
+import com.devinblack.kafka.connect.http.error.ErrorRecord;
 import com.devinblack.kafka.connect.http.response.ResponseHandler;
 import com.devinblack.kafka.connect.http.response.ResponseProducer;
 import com.devinblack.kafka.connect.http.response.ResponseRecord;
@@ -48,6 +51,8 @@ public class HttpSinkTask extends SinkTask {
     private ResponseProducer responseProducer;
     private ResponseHandler responseHandler;
     private RetryPolicy retryPolicy;
+    private ErrorProducer errorProducer;
+    private ErrorHandler errorHandler;
 
     @Override
     public String version() {
@@ -84,6 +89,13 @@ public class HttpSinkTask extends SinkTask {
             log.debug("Initializing response handler and producer");
             this.responseHandler = new ResponseHandler(config);
             this.responseProducer = new ResponseProducer(config);
+        }
+
+        // Initialize error handler and producer (if enabled)
+        if (config.isErrorTopicEnabled()) {
+            log.debug("Initializing error handler and producer");
+            this.errorHandler = new ErrorHandler(config);
+            this.errorProducer = new ErrorProducer(config);
         }
 
         log.info("HTTP Sink Task started successfully");
@@ -138,11 +150,29 @@ public class HttpSinkTask extends SinkTask {
         } catch (RecordConverter.ConversionException e) {
             log.error("Failed to convert record: topic={} partition={} offset={}",
                     record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
+
+            if (config.isErrorTopicEnabled()) {
+                sendToErrorTopic(record, "CONVERSION_ERROR",
+                        "Record conversion failed: " + e.getMessage(), null, 0);
+                // Continue processing (don't throw)
+                return;
+            }
+
+            // Only throw if error topic disabled
             throw new RuntimeException("Record conversion failed", e);
 
         } catch (Exception e) {
             log.error("Error processing record: topic={} partition={} offset={}",
                     record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
+
+            if (config.isErrorTopicEnabled()) {
+                sendToErrorTopic(record, "PROCESSING_ERROR",
+                        "Failed to process record: " + e.getMessage(), null, 0);
+                // Continue processing (don't throw)
+                return;
+            }
+
+            // Only throw if error topic disabled
             throw new RuntimeException("Failed to process record", e);
         }
     }
@@ -185,6 +215,14 @@ public class HttpSinkTask extends SinkTask {
                         log.error("HTTP request failed with status {} after {} attempts: topic={} partition={} offset={}",
                                 response.getStatusCode(), attemptNumber + 1,
                                 record.topic(), record.kafkaPartition(), record.kafkaOffset());
+
+                        // If error topic is enabled, send to error topic
+                        if (config.isErrorTopicEnabled()) {
+                            sendToErrorTopic(record, "RETRY_EXHAUSTED",
+                                    "HTTP request failed after " + (attemptNumber + 1) + " attempts",
+                                    response, attemptNumber + 1);
+                        }
+
                         return response; // Return the failed response
                     }
                 }
@@ -214,12 +252,32 @@ public class HttpSinkTask extends SinkTask {
                     } else {
                         log.error("HTTP request failed with exception after {} attempts: topic={} partition={} offset={}",
                                 attemptNumber + 1, record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
+
+                        // If error topic is enabled, send to error topic and don't throw
+                        if (config.isErrorTopicEnabled()) {
+                            sendToErrorTopic(record, "RETRY_EXHAUSTED",
+                                    "HTTP request failed after " + (attemptNumber + 1) + " attempts: " + e.getMessage(),
+                                    null, attemptNumber + 1);
+                            // Return a failure response instead of throwing
+                            return new HttpResponse(0, null, "Exception: " + e.getMessage(), 0);
+                        }
+
                         throw e;
                     }
                 } else {
                     // Non-retryable exception, throw immediately
                     log.error("HTTP request failed with non-retryable exception: topic={} partition={} offset={}",
                             record.topic(), record.kafkaPartition(), record.kafkaOffset(), e);
+
+                    // If error topic is enabled, send to error topic and don't throw
+                    if (config.isErrorTopicEnabled()) {
+                        sendToErrorTopic(record, "HTTP_EXCEPTION",
+                                "HTTP request failed with non-retryable exception: " + e.getMessage(),
+                                null, attemptNumber + 1);
+                        // Return a failure response instead of throwing
+                        return new HttpResponse(0, null, "Exception: " + e.getMessage(), 0);
+                    }
+
                     throw e;
                 }
             }
@@ -236,6 +294,12 @@ public class HttpSinkTask extends SinkTask {
             responseProducer.flush();
         }
 
+        // Flush error producer if enabled
+        if (errorProducer != null) {
+            log.debug("Flushing error producer");
+            errorProducer.flush();
+        }
+
         // Ensure all HTTP requests have completed before committing offsets
         // Since we process records synchronously, this is already guaranteed
     }
@@ -248,6 +312,12 @@ public class HttpSinkTask extends SinkTask {
         if (responseProducer != null) {
             log.debug("Closing response producer");
             responseProducer.close();
+        }
+
+        // Close error producer
+        if (errorProducer != null) {
+            log.debug("Closing error producer");
+            errorProducer.close();
         }
 
         // Close HTTP client
@@ -333,15 +403,23 @@ public class HttpSinkTask extends SinkTask {
      * Handle null record values based on configuration.
      */
     private void handleNullValue(SinkRecord record) {
-        String behavior = config.getBehaviorOnNullValues();
+        log.warn("Null value encountered in record: topic={} partition={} offset={}",
+                record.topic(), record.kafkaPartition(), record.kafkaOffset());
 
+        // If error topic is enabled, send to error topic and continue
+        if (config.isErrorTopicEnabled()) {
+            sendToErrorTopic(record, "NULL_VALUE",
+                    "Null value encountered in record", null, 0);
+            log.info("Null value sent to error topic");
+            return;
+        }
+
+        // Otherwise, use existing behavior
+        String behavior = config.getBehaviorOnNullValues();
         if ("fail".equals(behavior)) {
-            log.error("Null value encountered in record: topic={} partition={} offset={}",
-                    record.topic(), record.kafkaPartition(), record.kafkaOffset());
             throw new RuntimeException("Null value encountered in record");
         } else {
-            log.debug("Ignoring null value in record: topic={} partition={} offset={}",
-                    record.topic(), record.kafkaPartition(), record.kafkaOffset());
+            log.debug("Ignoring null value in record");
         }
     }
 
@@ -349,11 +427,20 @@ public class HttpSinkTask extends SinkTask {
      * Handle HTTP error responses based on configuration.
      */
     private void handleHttpError(HttpResponse response, SinkRecord record) {
-        String behavior = config.getBehaviorOnError();
-
         log.warn("HTTP request returned error status: {} for record topic={} partition={} offset={}",
                 response.getStatusCode(), record.topic(), record.kafkaPartition(), record.kafkaOffset());
 
+        // If error topic is enabled, send to error topic and continue
+        if (config.isErrorTopicEnabled()) {
+            sendToErrorTopic(record, "HTTP_ERROR",
+                    "HTTP request returned error status: " + response.getStatusCode(),
+                    response, 0);
+            log.info("HTTP error sent to error topic: status={}", response.getStatusCode());
+            return;
+        }
+
+        // Otherwise, use existing behavior
+        String behavior = config.getBehaviorOnError();
         if ("fail".equals(behavior)) {
             throw new RuntimeException(
                     "HTTP request failed with status " + response.getStatusCode() +
@@ -363,6 +450,53 @@ public class HttpSinkTask extends SinkTask {
             // Log the error but continue processing
             log.error("HTTP error (ignored): status={}, body={}",
                     response.getStatusCode(), response.getBody());
+        }
+    }
+
+    /**
+     * Send failed record to error topic (fire-and-forget).
+     * This method MUST NOT throw exceptions to avoid infinite error loops.
+     *
+     * @param originalRecord The original Kafka sink record that failed
+     * @param errorType The type of error (HTTP_ERROR, RETRY_EXHAUSTED, CONVERSION_ERROR, NULL_VALUE)
+     * @param errorMessage The error message
+     * @param httpResponse The HTTP response (if applicable, can be null)
+     * @param retryCount The number of retry attempts
+     */
+    private void sendToErrorTopic(
+            SinkRecord originalRecord,
+            String errorType,
+            String errorMessage,
+            HttpResponse httpResponse,
+            int retryCount) {
+
+        try {
+            if (errorHandler == null || errorProducer == null) {
+                log.warn("Error topic enabled but handler/producer not initialized");
+                return;
+            }
+
+            // Resolve the error topic name
+            String errorTopic = errorHandler.resolveErrorTopic(originalRecord);
+
+            // Create error record
+            ErrorRecord errorRecord = errorHandler.createErrorRecord(
+                    originalRecord,
+                    errorType,
+                    errorMessage,
+                    httpResponse,
+                    retryCount
+            );
+
+            // Send to Kafka (async, fire-and-forget)
+            errorProducer.sendAsync(errorRecord);
+
+            log.debug("Sent error record to topic={}, errorType={}", errorTopic, errorType);
+
+        } catch (Exception e) {
+            // CRITICAL: Log but NEVER throw - avoid infinite error loops
+            log.error("Failed to send error record to error topic: {}", e.getMessage(), e);
+            // This is a best-effort operation - don't fail the main processing
         }
     }
 }

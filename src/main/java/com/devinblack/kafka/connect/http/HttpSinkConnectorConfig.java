@@ -163,6 +163,20 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
     private static final String ERRORS_DEADLETTERQUEUE_TOPIC_NAME_DOC = "Dead letter queue topic name";
 
     // =============================
+    // ERROR TOPIC CONFIGURATION
+    // =============================
+    public static final String ERROR_TOPIC_ENABLED = "error.topic.enabled";
+    private static final boolean ERROR_TOPIC_ENABLED_DEFAULT = false;
+    private static final String ERROR_TOPIC_ENABLED_DOC =
+            "Enable publishing failed records to an error topic. When enabled, errors are sent to the error topic " +
+            "and processing continues (no exceptions thrown).";
+
+    public static final String ERROR_TOPIC_NAME = "error.topic.name";
+    private static final String ERROR_TOPIC_NAME_DOC =
+            "Error topic name (supports ${topic} variable for dynamic naming, e.g., ${topic}-errors). " +
+            "Required when error.topic.enabled is true.";
+
+    // =============================
     // RETRY CONFIGURATION
     // =============================
     public static final String RETRY_ENABLED = "retry.enabled";
@@ -426,6 +440,21 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
                 ERRORS_DEADLETTERQUEUE_TOPIC_NAME_DOC
         );
 
+        // Error Topic Configuration
+        configDef.define(
+                ERROR_TOPIC_ENABLED,
+                ConfigDef.Type.BOOLEAN,
+                ERROR_TOPIC_ENABLED_DEFAULT,
+                ConfigDef.Importance.HIGH,
+                ERROR_TOPIC_ENABLED_DOC
+        ).define(
+                ERROR_TOPIC_NAME,
+                ConfigDef.Type.STRING,
+                null,
+                ConfigDef.Importance.HIGH,
+                ERROR_TOPIC_NAME_DOC
+        );
+
         // Retry Configuration
         configDef.define(
                 RETRY_ENABLED,
@@ -511,6 +540,11 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
         // Validate DLQ configuration
         if ("all".equals(getErrorsTolerance()) && getErrorsDeadLetterQueueTopicName() == null) {
             throw new ConfigException("errors.deadletterqueue.topic.name is required when errors.tolerance is 'all'");
+        }
+
+        // Validate error topic configuration
+        if (isErrorTopicEnabled() && getErrorTopicName() == null) {
+            throw new ConfigException("error.topic.name is required when error.topic.enabled is true");
         }
     }
 
@@ -682,6 +716,15 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
 
     public String getErrorsDeadLetterQueueTopicName() {
         return getString(ERRORS_DEADLETTERQUEUE_TOPIC_NAME);
+    }
+
+    // Getters for Error Topic Configuration
+    public boolean isErrorTopicEnabled() {
+        return getBoolean(ERROR_TOPIC_ENABLED);
+    }
+
+    public String getErrorTopicName() {
+        return getString(ERROR_TOPIC_NAME);
     }
 
     // Getters for Retry Configuration
