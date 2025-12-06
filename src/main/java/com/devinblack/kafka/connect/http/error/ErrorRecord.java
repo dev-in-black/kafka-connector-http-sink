@@ -1,0 +1,64 @@
+package com.devinblack.kafka.connect.http.error;
+
+import org.apache.kafka.connect.header.Headers;
+
+/**
+ * Represents an error record to be sent to Kafka error topic.
+ *
+ * This is a simple POJO that encapsulates all the data needed to produce
+ * a Kafka record from a failed HTTP request or processing error.
+ */
+public class ErrorRecord {
+    private final String topic;
+    private final Object key;
+    private final byte[] value;
+    private final Headers headers;
+
+    public ErrorRecord(
+            String topic,
+            Object key,
+            byte[] value,
+            Headers headers) {
+        this.topic = topic;
+        this.key = key;
+        this.value = value;
+        this.headers = headers;
+    }
+
+    public String getTopic() {
+        return topic;
+    }
+
+    public Object getKey() {
+        return key;
+    }
+
+    public byte[] getValue() {
+        return value;
+    }
+
+    public Headers getHeaders() {
+        return headers;
+    }
+
+    @Override
+    public String toString() {
+        return "ErrorRecord{" +
+                "topic='" + topic + '\'' +
+                ", key=" + key +
+                ", valueLength=" + (value != null ? value.length : 0) +
+                ", headersCount=" + countHeaders() +
+                '}';
+    }
+
+    private int countHeaders() {
+        if (headers == null) {
+            return 0;
+        }
+        int count = 0;
+        for (@SuppressWarnings("unused") org.apache.kafka.connect.header.Header h : headers) {
+            count++;
+        }
+        return count;
+    }
+}

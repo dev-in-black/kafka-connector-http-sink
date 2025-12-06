@@ -132,6 +132,18 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
     private static final boolean RESPONSE_INCLUDE_REQUEST_METADATA_DEFAULT = true;
     private static final String RESPONSE_INCLUDE_REQUEST_METADATA_DOC = "Include request metadata in response headers";
 
+    public static final String RESPONSE_VALUE_FORMAT = "response.value.format";
+    private static final String RESPONSE_VALUE_FORMAT_DEFAULT = "string";
+    private static final String RESPONSE_VALUE_FORMAT_DOC =
+            "Format for response values sent to Kafka (string or json). " +
+            "JSON format validates response body is valid JSON and fails/warns if invalid.";
+
+    public static final String RESPONSE_ORIGINAL_HEADERS_INCLUDE = "response.original.headers.include";
+    private static final String RESPONSE_ORIGINAL_HEADERS_INCLUDE_DEFAULT = "";
+    private static final String RESPONSE_ORIGINAL_HEADERS_INCLUDE_DOC =
+            "Comma-separated list of original Kafka record header names to include in response. " +
+            "Empty means include all headers when response.include.original.headers is enabled.";
+
     // =============================
     // ERROR HANDLING CONFIGURATION
     // =============================
@@ -149,6 +161,20 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
 
     public static final String ERRORS_DEADLETTERQUEUE_TOPIC_NAME = "errors.deadletterqueue.topic.name";
     private static final String ERRORS_DEADLETTERQUEUE_TOPIC_NAME_DOC = "Dead letter queue topic name";
+
+    // =============================
+    // ERROR TOPIC CONFIGURATION
+    // =============================
+    public static final String ERROR_TOPIC_ENABLED = "error.topic.enabled";
+    private static final boolean ERROR_TOPIC_ENABLED_DEFAULT = false;
+    private static final String ERROR_TOPIC_ENABLED_DOC =
+            "Enable publishing failed records to an error topic. When enabled, errors are sent to the error topic " +
+            "and processing continues (no exceptions thrown).";
+
+    public static final String ERROR_TOPIC_NAME = "error.topic.name";
+    private static final String ERROR_TOPIC_NAME_DOC =
+            "Error topic name (supports ${topic} variable for dynamic naming, e.g., ${topic}-errors). " +
+            "Required when error.topic.enabled is true.";
 
     // =============================
     // RETRY CONFIGURATION
@@ -369,6 +395,19 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
                 RESPONSE_INCLUDE_REQUEST_METADATA_DEFAULT,
                 ConfigDef.Importance.LOW,
                 RESPONSE_INCLUDE_REQUEST_METADATA_DOC
+        ).define(
+                RESPONSE_VALUE_FORMAT,
+                ConfigDef.Type.STRING,
+                RESPONSE_VALUE_FORMAT_DEFAULT,
+                ConfigDef.ValidString.in("string", "json"),
+                ConfigDef.Importance.MEDIUM,
+                RESPONSE_VALUE_FORMAT_DOC
+        ).define(
+                RESPONSE_ORIGINAL_HEADERS_INCLUDE,
+                ConfigDef.Type.STRING,
+                RESPONSE_ORIGINAL_HEADERS_INCLUDE_DEFAULT,
+                ConfigDef.Importance.LOW,
+                RESPONSE_ORIGINAL_HEADERS_INCLUDE_DOC
         );
 
         // Error Handling Configuration
@@ -399,6 +438,21 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
                 null,
                 ConfigDef.Importance.MEDIUM,
                 ERRORS_DEADLETTERQUEUE_TOPIC_NAME_DOC
+        );
+
+        // Error Topic Configuration
+        configDef.define(
+                ERROR_TOPIC_ENABLED,
+                ConfigDef.Type.BOOLEAN,
+                ERROR_TOPIC_ENABLED_DEFAULT,
+                ConfigDef.Importance.HIGH,
+                ERROR_TOPIC_ENABLED_DOC
+        ).define(
+                ERROR_TOPIC_NAME,
+                ConfigDef.Type.STRING,
+                null,
+                ConfigDef.Importance.HIGH,
+                ERROR_TOPIC_NAME_DOC
         );
 
         // Retry Configuration
@@ -486,6 +540,11 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
         // Validate DLQ configuration
         if ("all".equals(getErrorsTolerance()) && getErrorsDeadLetterQueueTopicName() == null) {
             throw new ConfigException("errors.deadletterqueue.topic.name is required when errors.tolerance is 'all'");
+        }
+
+        // Validate error topic configuration
+        if (isErrorTopicEnabled() && getErrorTopicName() == null) {
+            throw new ConfigException("error.topic.name is required when error.topic.enabled is true");
         }
     }
 
@@ -627,6 +686,21 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
         return getBoolean(RESPONSE_INCLUDE_REQUEST_METADATA);
     }
 
+    public String getResponseValueFormat() {
+        return getString(RESPONSE_VALUE_FORMAT);
+    }
+
+    public List<String> getResponseOriginalHeadersInclude() {
+        String include = getString(RESPONSE_ORIGINAL_HEADERS_INCLUDE);
+        if (include == null || include.trim().isEmpty()) {
+            return null;  // null means include all
+        }
+        return Arrays.stream(include.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+    }
+
     // Getters for Error Handling Configuration
     public String getBehaviorOnNullValues() {
         return getString(BEHAVIOR_ON_NULL_VALUES);
@@ -642,6 +716,15 @@ public class HttpSinkConnectorConfig extends AbstractConfig {
 
     public String getErrorsDeadLetterQueueTopicName() {
         return getString(ERRORS_DEADLETTERQUEUE_TOPIC_NAME);
+    }
+
+    // Getters for Error Topic Configuration
+    public boolean isErrorTopicEnabled() {
+        return getBoolean(ERROR_TOPIC_ENABLED);
+    }
+
+    public String getErrorTopicName() {
+        return getString(ERROR_TOPIC_NAME);
     }
 
     // Getters for Retry Configuration

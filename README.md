@@ -193,7 +193,75 @@ retry.on.status.codes=429,500,502,503,504
 | `response.topic.name` | String | (required if enabled) | Response topic name (supports ${topic} variable) |
 | `response.include.original.key` | Boolean | true | Include original record key in response |
 | `response.include.original.headers` | Boolean | true | Include original headers in response |
+| `response.original.headers.include` | String | "" | Comma-separated list of original header names to include (empty = all) |
 | `response.include.request.metadata` | Boolean | true | Include request metadata in response headers |
+| `response.value.format` | String | string | Response value format: `string` (pass-through) or `json` (validate JSON) |
+
+#### Response Value Format Options
+
+**`string` (default)**: Pass through response body as-is
+- Works with any content type (JSON, HTML, XML, plain text)
+- No validation performed
+- Backward compatible with existing behavior
+
+**`json`**: Validate response body is valid JSON
+- Logs error if response body is not valid JSON
+- Falls back to string format on validation failure
+- Useful for ensuring downstream consumers receive valid JSON
+
+**Example configurations:**
+
+```properties
+# String format (default) - works with any response type
+response.topic.enabled=true
+response.topic.name=http-responses
+response.value.format=string
+
+# JSON format - validates response is valid JSON
+response.topic.enabled=true
+response.topic.name=http-responses
+response.value.format=json
+response.include.request.metadata=true
+```
+
+**Kafka Message Structure:**
+
+Both formats produce the same Kafka message structure:
+- **Key**: Original record key (if `response.include.original.key=true`)
+- **Value**: Response body as UTF-8 string
+- **Headers**: Metadata and original headers (if configured)
+
+The difference is that `json` format validates the response body before sending.
+
+#### Original Header Filtering
+
+Control which original Kafka record headers are forwarded to the response topic:
+
+**Configuration:**
+- `response.include.original.headers` - Master switch (true/false)
+- `response.original.headers.include` - Whitelist of header names (comma-separated)
+
+**Behavior:**
+- If `response.include.original.headers=false`: No original headers forwarded
+- If `response.include.original.headers=true` AND `response.original.headers.include` is empty: Forward ALL original headers (default)
+- If `response.include.original.headers=true` AND include list specified: Forward ONLY listed headers
+
+**Example configurations:**
+
+```properties
+# Forward all original headers (default)
+response.include.original.headers=true
+response.original.headers.include=
+
+# Forward only specific headers
+response.include.original.headers=true
+response.original.headers.include=traceId,userId,requestId
+
+# Forward no original headers
+response.include.original.headers=false
+```
+
+**Note:** This filtering applies ONLY to original Kafka record headers. HTTP response headers and metadata headers are not affected.
 
 ### Error Handling Configuration
 

@@ -7,7 +7,7 @@
 
     <groupId>com.devinblack.kafka.connect</groupId>
     <artifactId>kafka-connect-http-sink</artifactId>
-    <version>v0.1.4</version>
+    <version>v0.1.6</version>
     <packaging>jar</packaging>
 
     <name>Kafka Connect HTTP Sink Connector</name>

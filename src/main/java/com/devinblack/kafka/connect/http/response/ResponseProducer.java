@@ -7,12 +7,12 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,7 +39,7 @@ public class ResponseProducer {
     private static final Logger log = LoggerFactory.getLogger(ResponseProducer.class);
 
     private final HttpSinkConnectorConfig config;
-    private Producer<String, byte[]> producer;
+    private Producer<String, String> producer;
     private final Duration sendTimeout;
 
     public ResponseProducer(HttpSinkConnectorConfig config) {
@@ -60,7 +60,7 @@ public class ResponseProducer {
 
         // Producer-specific overrides
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class.getName());
+        producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
         // Set client ID for tracking
         producerProps.put(ProducerConfig.CLIENT_ID_CONFIG, "http-sink-response-producer");
@@ -96,7 +96,7 @@ public class ResponseProducer {
      * @throws ConnectException if sending fails
      */
     public RecordMetadata send(ResponseRecord responseRecord) {
-        ProducerRecord<String, byte[]> producerRecord = toProducerRecord(responseRecord);
+        ProducerRecord<String, String> producerRecord = toProducerRecord(responseRecord);
 
         log.debug("Sending response to topic={}, partition=calculated, key={}",
                 producerRecord.topic(), producerRecord.key());
@@ -137,7 +137,7 @@ public class ResponseProducer {
      * @param responseRecord The response record to send
      */
     public void sendAsync(ResponseRecord responseRecord) {
-        ProducerRecord<String, byte[]> producerRecord = toProducerRecord(responseRecord);
+        ProducerRecord<String, String> producerRecord = toProducerRecord(responseRecord);
 
         log.debug("Sending response asynchronously to topic={}, key={}",
                 producerRecord.topic(), producerRecord.key());
@@ -156,10 +156,13 @@ public class ResponseProducer {
     /**
      * Convert ResponseRecord to Kafka ProducerRecord.
      */
-    private ProducerRecord<String, byte[]> toProducerRecord(ResponseRecord responseRecord) {
+    private ProducerRecord<String, String> toProducerRecord(ResponseRecord responseRecord) {
         String topic = responseRecord.getTopic();
         String key = responseRecord.getKey() != null ? responseRecord.getKey().toString() : null;
-        byte[] value = responseRecord.getValue();
+
+        // Convert byte[] value to String using UTF-8 encoding
+        byte[] valueBytes = responseRecord.getValue();
+        String value = valueBytes != null ? new String(valueBytes, StandardCharsets.UTF_8) : null;
 
         // Convert Connect Headers to Kafka Headers
         List<Header> kafkaHeaders = new ArrayList<>();
@@ -182,7 +185,8 @@ public class ResponseProducer {
     }
 
     /**
-     * Convert Connect header value to byte array.
+     * Convert Connect header value to byte array using UTF-8 encoding.
+     * All values are serialized as strings (converted to UTF-8 bytes).
      */
     private byte[] convertHeaderValue(org.apache.kafka.connect.header.Header header) {
         Object value = header.value();
@@ -190,16 +194,17 @@ public class ResponseProducer {
             return null;
         }
 
+        // All header values are serialized as UTF-8 strings
         if (value instanceof byte[]) {
             return (byte[]) value;
         } else if (value instanceof String) {
-            return ((String) value).getBytes();
+            return ((String) value).getBytes(StandardCharsets.UTF_8);
         } else if (value instanceof Number) {
-            return value.toString().getBytes();
+            return value.toString().getBytes(StandardCharsets.UTF_8);
         } else if (value instanceof Boolean) {
-            return value.toString().getBytes();
+            return value.toString().getBytes(StandardCharsets.UTF_8);
         } else {
-            return value.toString().getBytes();
+            return value.toString().getBytes(StandardCharsets.UTF_8);
         }
     }
 
